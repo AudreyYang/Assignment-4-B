@@ -17,6 +17,12 @@ var plot = canvas
 //Scales
 var scaleX = d3.scale.linear().domain([1960,2015]).range([0,width]),
     scaleY = d3.scale.linear().domain([0,11000000]).range([height,0]);
+//line generator
+var lineGenerator = d3.svg.line()
+    .x(function(d){ return scaleX(d.year)})
+    .y(function(d){ return scaleY(d.value)})
+    .interpolate('basis');
+
 
 //Axis
 var axisX = d3.svg.axis()
@@ -28,7 +34,7 @@ var axisY = d3.svg.axis()
     .tickSize(width)
     .scale(scaleY);
 
-//Draw axes
+//Draw axis
 plot.append('g').attr('class','axis axis-x')
     .attr('transform','translate(0,'+height+')')
     .call(axisX);
@@ -36,24 +42,103 @@ plot.append('g').attr('class','axis axis-y')
     .call(axisY);
 
 //Start importing data
-d3.csv('/data/world_bank_2012.csv', parse, dataLoaded);
+ d3.csv('data/fao_combined_world_1963_2013.csv', parse, dataLoaded);
 
-function parse(d){
+
+
 
     //Eliminate records for which gdp per capita isn't available
 
     //Check "primary completion" and "urban population" columns
     //if figure is unavailable and denoted as "..", replace it with undefined
     //otherwise, parse the figure into numbers
-    return {
-
-    };
 
 
+function dataLoaded(error, data, metadata) {
+
+    var nestedData = d3.nest()
+        .key(function (d) {
+            return d.item;
+        })
+        .entries(data)
+
+    console.log(nestedData)
+   console.log(nestedData[0])
+    console.log(nestedData[1])
+
+    plot.append('path')
+        .datum(nestedData[0].values)
+        .attr('class','tea-data-line data-line')
+        .attr('d',lineGenerator)
+        .call(attachTooltip)
+
+    plot.append('path')
+        .datum(nestedData[1].values)
+        .attr('class','coffee-data-line data-line')
+        .attr('d',lineGenerator)
+        .call(attachTooltip)
+
+    draw(nestedData[0].values)//draw tea
+    draw(nestedData[1].values)//draw coffee
 
 }
+    function draw(dataSeries) {
 
-function dataLoaded(error, rows){
+        console.log(dataSeries)
 
+        var dots = plot.selectAll('.coffee-data-point .tea-data-point')
+            .data(dataSeries);
+        var dotsEnter = dots.enter()
+            .append('circle')
+            .attr('class','data-point')
+            .attr('r',3)
+            .call(attachTooltip);
+        dots.exit().transition().remove();
+        dots
+            .transition()
+            .attr('cx',function(d){return scaleX(d.year)})
+            .attr('cy',function(d){return scaleY(d.value)});
+    }
+
+    function attachTooltip(selection){
+        selection
+            .on('mouseenter',function(d){
+                var tooltip = d3.select('.custom-tooltip');
+                tooltip
+                    .transition()
+                    .style('opacity',1);
+
+                tooltip.select('#type').html(d.item);
+                tooltip.select('#year').html(d.year);
+                tooltip.select('#value').html(d.value);
+
+            })
+
+            .on('mousemove',function(){
+                var xy = d3.mouse(canvas.node());
+                console.log(xy);
+
+                var tooltip = d3.select('.custom-tooltip');
+
+                tooltip
+                    .style('left',xy[0]+50+'px')
+                    .style('top',(xy[1]+50)+'px');
+
+            })
+            .on('mouseleave',function(){
+                var tooltip = d3.select('.custom-tooltip')
+                    .transition()
+                    .style('opacity',0);
+            })
+    }
+
+    function parse(d){
+        return {
+            item: d.ItemName,
+            year: +d.Year,
+            value: +d.Value
+        }
+    }
+function parseMetadata(d){
 }
 
